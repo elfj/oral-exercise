@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>口咽肌肉功能訓練系統</title>
+<style>
+:root {
+  --primary: #4A90D9;
+  --primary-light: #E8F0FE;
+  --success: #4CAF50;
+  --success-light: #E8F5E9;
+  --warning: #FF9800;
+  --danger: #E53935;
+  --bg: #F5F7FA;
+  --card: #FFFFFF;
+  --text: #333333;
+  --text-light: #777777;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, "Microsoft JhengHei", "Noto Sans TC", sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+.page { display:none; min-height:100vh; }
+.page.active { display:flex; flex-direction:column; }
+.container { max-width:720px; margin:0 auto; padding:20px; width:100%; }
+
+/* Home */
+#page-home { justify-content:center; align-items:center; text-align:center; }
+.logo { font-size:48px; margin-bottom:16px; }
+.title { font-size:28px; font-weight:700; margin-bottom:8px; }
+.subtitle { font-size:16px; color:var(--text-light); margin-bottom:40px; }
+.mode-buttons { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+.mode-btn { padding:20px 32px; border-radius:16px; border:2px solid var(--primary); background:var(--card); cursor:pointer; transition:all .2s; min-width:200px; }
+.mode-btn:hover { background:var(--primary); color:white; transform:translateY(-2px); box-shadow:var(--shadow); }
+.mode-btn .icon { font-size:36px; display:block; margin-bottom:8px; }
+.mode-btn .label { font-size:18px; font-weight:600; }
+.mode-btn .desc { font-size:13px; color:var(--text-light); margin-top:4px; }
+.mode-btn:hover .desc { color:rgba(255,255,255,0.8); }
+
+/* Select */
+#page-select .header { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+.back-btn { background:none; border:none; font-size:24px; cursor:pointer; padding:8px; border-radius:8px; }
+.back-btn:hover { background:var(--primary-light); }
+.exercise-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.exercise-card { background:var(--card); border-radius:16px; padding:24px; cursor:pointer; transition:all .2s; border:2px solid transparent; box-shadow:var(--shadow); text-align:center; }
+.exercise-card:hover { border-color:var(--primary); transform:translateY(-2px); }
+.exercise-card .icon { font-size:40px; margin-bottom:8px; }
+.exercise-card .name { font-size:16px; font-weight:600; margin-bottom:4px; }
+.exercise-card .info { font-size:12px; color:var(--text-light); }
+
+/* Exercise */
+#page-exercise { background:#000; position:relative; }
+.camera-container { position:relative; width:100%; height:100vh; overflow:hidden; }
+#video { display:none; }
+#canvas { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+.overlay { position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; display:flex; flex-direction:column; }
+.overlay-top { padding:16px 20px; display:flex; justify-content:space-between; align-items:flex-start; }
+.exercise-badge { background:rgba(0,0,0,0.6); color:white; padding:10px 20px; border-radius:12px; backdrop-filter:blur(8px); }
+.exercise-badge .ex-icon { font-size:24px; }
+.exercise-badge .ex-name { font-size:18px; font-weight:600; }
+.exercise-badge .ex-desc { font-size:12px; opacity:0.8; margin-top:2px; }
+.exit-btn { pointer-events:auto; background:rgba(255,255,255,0.2); border:none; color:white; width:44px; height:44px; border-radius:50%; font-size:20px; cursor:pointer; backdrop-filter:blur(8px); }
+.exit-btn:hover { background:rgba(255,255,255,0.3); }
+.overlay-center { flex:1; display:flex; align-items:center; justify-content:center; }
+.countdown-display { font-size:120px; font-weight:700; color:white; text-shadow:0 4px 20px rgba(0,0,0,0.5); animation:pulse 0.5s ease-in-out; }
+.no-face-warning { background:rgba(231,76,60,0.8); color:white; padding:12px 24px; border-radius:12px; font-size:16px; backdrop-filter:blur(8px); }
+@keyframes pulse { 0%{transform:scale(1.3);opacity:0.5} 100%{transform:scale(1);opacity:1} }
+.overlay-bottom { padding:20px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+.status-indicator { display:flex; align-items:center; gap:8px; padding:8px 20px; border-radius:20px; font-size:15px; font-weight:600; backdrop-filter:blur(8px); transition:all .3s; }
+.status-indicator.inactive { background:rgba(255,255,255,0.2); color:rgba(255,255,255,0.7); }
+.status-indicator.active { background:rgba(76,175,80,0.8); color:white; }
+.status-dot { width:12px; height:12px; border-radius:50%; }
+.status-indicator.inactive .status-dot { background:rgba(255,255,255,0.4); }
+.status-indicator.active .status-dot { background:#fff; animation:blink 0.6s infinite alternate; }
+@keyframes blink { 0%{opacity:1} 100%{opacity:0.4} }
+.counter-display { display:flex; align-items:center; gap:16px; background:rgba(0,0,0,0.6); padding:16px 28px; border-radius:16px; backdrop-filter:blur(8px); }
+.counter-number { font-size:48px; font-weight:700; color:white; min-width:80px; text-align:center; }
+.counter-label { color:rgba(255,255,255,0.7); font-size:14px; }
+.counter-target { font-size:20px; color:rgba(255,255,255,0.5); }
+.hold-bar-container { width:200px; height:8px; background:rgba(255,255,255,0.2); border-radius:4px; overflow:hidden; }
+.hold-bar { height:100%; background:var(--success); border-radius:4px; transition:width 0.1s linear; width:0%; }
+.score-bar { width:200px; height:6px; background:rgba(255,255,255,0.15); border-radius:3px; overflow:hidden; margin-top:4px; }
+.score-fill { height:100%; background:var(--primary); border-radius:3px; transition:width 0.05s; }
+.rep-flash { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:80px; color:var(--success); animation:repFlash 0.8s ease-out forwards; pointer-events:none; }
+@keyframes repFlash { 0%{transform:translate(-50%,-50%) scale(0.5);opacity:1} 100%{transform:translate(-50%,-50%) scale(2);opacity:0} }
+
+/* Result */
+#page-result, #page-course-result { justify-content:center; align-items:center; text-align:center; }
+.result-card { background:var(--card); border-radius:20px; padding:40px; box-shadow:var(--shadow); max-width:400px; width:100%; }
+.result-icon { font-size:64px; margin-bottom:16px; }
+.result-title { font-size:24px; font-weight:700; margin-bottom:8px; }
+.result-detail { font-size:16px; color:var(--text-light); margin-bottom:24px; }
+.result-stats { display:flex; gap:20px; justify-content:center; margin-bottom:28px; }
+.stat { text-align:center; }
+.stat-value { font-size:32px; font-weight:700; color:var(--primary); }
+.stat-label { font-size:12px; color:var(--text-light); }
+.btn-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.btn { padding:12px 24px; border-radius:12px; border:none; font-size:15px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-primary { background:var(--primary); color:white; }
+.btn-primary:hover { background:#3A7BC8; }
+.btn-secondary { background:var(--primary-light); color:var(--primary); }
+.btn-secondary:hover { background:#D0E2FC; }
+.course-summary { margin-bottom:24px; text-align:left; }
+.course-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #eee; }
+.course-item .ci-icon { font-size:24px; }
+.course-item .ci-name { flex:1; font-size:14px; }
+.course-item .ci-result { font-size:14px; font-weight:600; color:var(--success); }
+
+/* Loading */
+.loading-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; color:white; }
+.spinner { width:48px; height:48px; border:4px solid rgba(255,255,255,0.2); border-top-color:white; border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:16px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-text { font-size:16px; opacity:0.8; }
+
+/* Start button */
+.start-btn { pointer-events:auto; padding:16px 40px; background:var(--success); color:white; border:none; border-radius:16px; font-size:20px; font-weight:700; cursor:pointer; transition:all .2s; box-shadow:0 4px 16px rgba(76,175,80,0.4); }
+.start-btn:hover { transform:scale(1.05); }
+
+/* Demo Animation Panel */
+.demo-panel {
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  width:150px; background:rgba(255,255,255,0.92); border-radius:16px;
+  padding:10px 10px 6px; box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  pointer-events:none; z-index:10; text-align:center;
+}
+.demo-panel .demo-label { font-size:11px; color:#666; margin-top:2px; font-weight:600; }
+.demo-panel svg { display:block; margin:0 auto; }
+
+@media (max-width:600px) {
+  .exercise-grid { grid-template-columns:1fr; }
+  .counter-number { font-size:36px; }
+  .countdown-display { font-size:80px; }
+  .mode-buttons { flex-direction:column; align-items:center; }
+  .demo-panel { width:110px; left:6px; padding:6px 6px 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loading" class="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <div class="loading-text">正在載入臉部偵測模型...</div>
+</div>
+
+<!-- HOME PAGE -->
+<div id="page-home" class="page active">
+  <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh">
+    <div class="logo">🏥</div>
+    <div class="title">口咽肌肉功能訓練系統</div>
+    <div class="subtitle">透過 Webcam 即時偵測，引導你完成口咽肌肉訓練動作</div>
+    <div class="mode-buttons">
+      <button class="mode-btn" onclick="app.startSingleMode()">
+        <span class="icon">🎯</span>
+        <span class="label">單項練習</span>
+        <span class="desc">選擇一個動作來練習</span>
+      </button>
+      <button class="mode-btn" onclick="app.startCourseMode()">
+        <span class="icon">📋</span>
+        <span class="label">完整課程</span>
+        <span class="desc">依序完成全部 5 個動作</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SELECT PAGE -->
+<div id="page-select" class="page">
+  <div class="container">
+    <div class="header">
+      <button class="back-btn" onclick="app.goHome()">←</button>
+      <h2>選擇練習動作</h2>
+    </div>
+    <div class="exercise-grid" id="exercise-grid"></div>
+  </div>
+</div>
+
+<!-- EXERCISE PAGE -->
+<div id="page-exercise" class="page">
+  <div class="camera-container">
+    <video id="video" playsinline></video>
+    <canvas id="canvas"></canvas>
+    <div class="overlay">
+      <div class="overlay-top">
+        <div class="exercise-badge">
+          <span class="ex-icon" id="ex-icon"></span>
+          <span class="ex-name" id="ex-name"></span>
+          <div class="ex-desc" id="ex-desc"></div>
+        </div>
+        <button class="exit-btn" onclick="app.exitExercise()">✕</button>
+      </div>
+      <div class="demo-panel" id="demo-panel" style="display:none"></div>
+      <div class="overlay-center">
+        <div id="countdown-area"></div>
+      </div>
+      <div class="overlay-bottom" id="bottom-hud" style="display:none">
+        <div class="status-indicator inactive" id="status-indicator">
+          <div class="status-dot"></div>
+          <span id="status-text">等待動作</span>
+        </div>
+        <div class="score-bar"><div class="score-fill" id="score-fill"></div></div>
+        <div style="color:rgba(255,255,255,0.5);font-size:11px;" id="debug-score"></div>
+        <div id="bs-debug-panel" style="display:none;position:fixed;right:8px;top:8px;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:10px;line-height:1.6;z-index:999;pointer-events:none;min-width:220px;backdrop-filter:blur(4px)"></div>
+        <div id="hold-area" style="display:none">
+          <div class="hold-bar-container"><div class="hold-bar" id="hold-bar"></div></div>
+        </div>
+        <div class="counter-display">
+          <div>
+            <div class="counter-number"><span id="counter-current">0</span><span class="counter-target">/<span id="counter-target">5</span></span></div>
+            <div class="counter-label">完成次數</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT PAGE (single) -->
+<div id="page-result" class="page">
+  <div class="container" style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+    <div class="result-card">
+      <div class="result-icon" id="result-icon">🎉</div>
+      <div class="result-title" id="result-title">練習完成！</div>
+      <div class="result-detail" id="result-detail"></div>
+      <div class="result-stats">
+        <div class="stat"><div class="stat-value" id="result-reps">0</div><div class="stat-label">完成次數</div></div>
+        <div class="stat"><div class="stat-value" id="result-time">0</div><div class="stat-label">用時（秒）</div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="app.retryExercise()">再來一次</button>
+        <button class="btn btn-secondary" onclick="app.goHome()">返回首頁</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COURSE RESULT PAGE -->
+<div id="page-course-result" class="page">
+  <div class="container" style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+    <div class="result-card">
+      <div class="result-icon">🏆</div>
+      <div class="result-title">課程完成！</div>
+      <div class="result-detail">太棒了，你完成了全部 5 個動作的訓練</div>
+      <div class="course-summary" id="course-summary"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="app.startCourseMode()">重新開始課程</button>
+        <button class="btn btn-secondary" onclick="app.goHome()">返回首頁</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================
+//  MediaPipe Face Landmarker Import
+// ============================================================
+import { FaceLandmarker, FilesetResolver, DrawingUtils }
+  from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+// ============================================================
+//  Exercise Configuration
+// ============================================================
+const EXERCISES = [
+  {
+    id: 'underbite', icon: '🌍', name: '戽斗星球',
+    desc: '下顎往前突出，維持 3 秒',
+    instruction: '請將下巴盡量往前推',
+    type: 'hold', holdMs: 3000, target: 5,
+    blendshape: 'jawForward', enterThreshold: 0.10, exitThreshold: 0.05,
+  },
+  {
+    id: 'frog', icon: '🐸', name: '青蛙捕食',
+    desc: '舌頭伸出嘴外，往上指',
+    instruction: '請張大嘴巴，舌頭用力往前伸出',
+    type: 'toggle', target: 5,
+    getScore: (bs) => {
+      // 複合偵測：張嘴 + 下唇下拉 + 嘴巴伸展 = 伸舌頭的特徵
+      const jaw = bs('jawOpen');
+      const lowerDown = (bs('mouthLowerDownLeft') + bs('mouthLowerDownRight')) / 2;
+      const shrugLower = bs('mouthShrugLower');
+      return jaw * 0.5 + lowerDown * 0.3 + shrugLower * 0.2;
+    },
+    enterThreshold: 0.22, exitThreshold: 0.10,
+  },
+  {
+    id: 'octopus', icon: '🐙', name: '章魚吸盤',
+    desc: '嘟嘴（啾嘴）後放鬆',
+    instruction: '請用力嘟嘴，像親親的嘴型',
+    type: 'toggle', target: 5,
+    blendshape: 'mouthPucker', enterThreshold: 0.25, exitThreshold: 0.10,
+  },
+  {
+    id: 'pufferfish', icon: '🐡', name: '河豚鼓鼓',
+    desc: '臉頰鼓起後放鬆',
+    instruction: '請將臉頰用力鼓起來',
+    type: 'toggle', target: 5,
+    blendshape: 'cheekPuff', enterThreshold: 0.12, exitThreshold: 0.04,
+  },
+  {
+    id: 'smile', icon: '😁', name: '一笑呷百二',
+    desc: '用力大笑，維持 3 秒',
+    instruction: '請用力笑，露出牙齒',
+    type: 'hold', holdMs: 3000, target: 5,
+    getScore: (bs) => (bs('mouthSmileLeft') + bs('mouthSmileRight')) / 2,
+    enterThreshold: 0.28, exitThreshold: 0.12,
+  },
+];
+
+// ============================================================
+//  Smoothing Helper
+// ============================================================
+class Smoother {
+  constructor(alpha = 0.5) { this.alpha = alpha; this.value = 0; }
+  update(raw) { this.value = this.value * (1 - this.alpha) + raw * this.alpha; return this.value; }
+  reset() { this.value = 0; }
+}
+
+// ============================================================
+//  Exercise Detector
+// ============================================================
+class ExerciseDetector {
+  constructor(config) {
+    this.config = config;
+    this.smoother = new Smoother(0.35);
+    this.isActive = false;
+    this.reps = 0;
+    this.holdStart = 0;
+    this.holdProgress = 0;
+    this.cooldown = false;
+    this.cooldownEnd = 0;
+    this.rawScore = 0;
+  }
+
+  reset() {
+    this.smoother.reset();
+    this.isActive = false;
+    this.reps = 0;
+    this.holdStart = 0;
+    this.holdProgress = 0;
+    this.cooldown = false;
+    this.cooldownEnd = 0;
+    this.rawScore = 0;
+  }
+
+  // Returns {isActive, score, holdProgress (0-1), repCompleted}
+  update(blendshapeGetter, now) {
+    const c = this.config;
+    // Get raw score
+    let raw;
+    if (c.getScore) {
+      raw = c.getScore(blendshapeGetter);
+    } else {
+      raw = blendshapeGetter(c.blendshape);
+    }
+    const score = this.smoother.update(raw);
+    this.rawScore = score;
+
+    // Cooldown check
+    if (this.cooldown && now < this.cooldownEnd) {
+      return { isActive: false, score, holdProgress: 0, repCompleted: false };
+    }
+    this.cooldown = false;
+
+    let repCompleted = false;
+
+    if (c.type === 'toggle') {
+      if (!this.isActive && score > c.enterThreshold) {
+        this.isActive = true;
+      } else if (this.isActive && score < c.exitThreshold) {
+        this.isActive = false;
+        this.reps++;
+        repCompleted = true;
+        this.cooldown = true;
+        this.cooldownEnd = now + 300;
+      }
+      return { isActive: this.isActive, score, holdProgress: 0, repCompleted };
+    }
+
+    if (c.type === 'hold') {
+      if (score > c.enterThreshold) {
+        if (!this.isActive) {
+          this.isActive = true;
+          this.holdStart = now;
+        }
+        const elapsed = now - this.holdStart;
+        this.holdProgress = Math.min(elapsed / c.holdMs, 1);
+        if (elapsed >= c.holdMs) {
+          this.reps++;
+          repCompleted = true;
+          this.isActive = false;
+          this.holdProgress = 0;
+          this.cooldown = true;
+          this.cooldownEnd = now + 500;
+        }
+      } else if (score < c.exitThreshold) {
+        this.isActive = false;
+        this.holdProgress = 0;
+        this.holdStart = 0;
+      }
+      return { isActive: this.isActive, score, holdProgress: this.holdProgress, repCompleted };
+    }
+  }
+}
+
+// ============================================================
+//  Animated Demo SVG Generator
+// ============================================================
+function getDemoSVG(exerciseId) {
+  const face = `
+    <ellipse cx="100" cy="100" rx="70" ry="85" fill="#FFE0C0" stroke="#D4A574" stroke-width="1.5"/>
+    <ellipse cx="73" cy="78" rx="7" ry="5" fill="#444"/>
+    <ellipse cx="127" cy="78" rx="7" ry="5" fill="#444"/>
+    <path d="M97,90 L95,104 Q100,107 105,104 L103,90" fill="none" stroke="#D4A574" stroke-width="1"/>`;
+
+  const anims = {
+    underbite: `
+      <g>
+        <animateTransform attributeName="transform" type="translate"
+          values="0,0;0,10;0,10;0,0" keyTimes="0;0.3;0.7;1" dur="4s" repeatCount="indefinite"/>
+        <path d="M42,128 Q100,168 158,128" fill="#FFD8AE" stroke="#D4A574" stroke-width="1.5"/>
+        <line x1="82" y1="126" x2="118" y2="126" stroke="#C08080" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+      <text x="100" y="208" text-anchor="middle" fill="#888" font-size="12" font-weight="600">下巴往前推</text>
+      <path d="M100,170 L100,185" stroke="#4A90D9" stroke-width="2" marker-end="url(#arr)">
+        <animate attributeName="d" values="M100,170 L100,185;M100,175 L100,195;M100,175 L100,195;M100,170 L100,185"
+          keyTimes="0;0.3;0.7;1" dur="4s" repeatCount="indefinite"/>
+      </path>
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4A90D9"/></marker></defs>`,
+
+    frog: `
+      <ellipse cx="100" cy="128" rx="16" ry="5" fill="#8B3030">
+        <animate attributeName="ry" values="5;18;18;5" keyTimes="0;0.2;0.7;1" dur="3s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="100" cy="148" rx="10" ry="0" fill="#E86060" stroke="#C04040" stroke-width="0.5">
+        <animate attributeName="ry" values="0;20;20;0" keyTimes="0;0.25;0.65;1" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="cy" values="136;152;152;136" keyTimes="0;0.25;0.65;1" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="rx" values="6;11;11;6" keyTimes="0;0.25;0.65;1" dur="3s" repeatCount="indefinite"/>
+      </ellipse>
+      <text x="100" y="208" text-anchor="middle" fill="#888" font-size="12" font-weight="600">張嘴伸舌頭</text>`,
+
+    octopus: `
+      <ellipse cx="100" cy="130" rx="18" ry="6" fill="#C08080">
+        <animate attributeName="rx" values="18;6;6;18" keyTimes="0;0.25;0.65;1" dur="2.5s" repeatCount="indefinite"/>
+        <animate attributeName="ry" values="6;10;10;6" keyTimes="0;0.25;0.65;1" dur="2.5s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="100" cy="130" rx="0" ry="0" fill="none" stroke="#D4A574" stroke-width="1.5">
+        <animate attributeName="rx" values="0;10;10;0" keyTimes="0;0.25;0.65;1" dur="2.5s" repeatCount="indefinite"/>
+        <animate attributeName="ry" values="0;13;13;0" keyTimes="0;0.25;0.65;1" dur="2.5s" repeatCount="indefinite"/>
+      </ellipse>
+      <text x="100" y="208" text-anchor="middle" fill="#888" font-size="12" font-weight="600">嘟嘴再放鬆</text>`,
+
+    pufferfish: `
+      <line x1="85" y1="128" x2="115" y2="128" stroke="#C08080" stroke-width="2" stroke-linecap="round"/>
+      <ellipse cx="38" cy="112" rx="0" ry="0" fill="#FFD0A0" stroke="#E0B080" stroke-width="1">
+        <animate attributeName="rx" values="0;20;0;0;0" keyTimes="0;0.2;0.4;0.6;1" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="ry" values="0;16;0;0;0" keyTimes="0;0.2;0.4;0.6;1" dur="4s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="162" cy="112" rx="0" ry="0" fill="#FFD0A0" stroke="#E0B080" stroke-width="1">
+        <animate attributeName="rx" values="0;0;0;20;0" keyTimes="0;0.4;0.5;0.7;1" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="ry" values="0;0;0;16;0" keyTimes="0;0.4;0.5;0.7;1" dur="4s" repeatCount="indefinite"/>
+      </ellipse>
+      <text x="100" y="208" text-anchor="middle" fill="#888" font-size="12" font-weight="600">左右臉頰交替鼓</text>`,
+
+    smile: `
+      <path d="M82,128 Q100,136 118,128" fill="none" stroke="#C08080" stroke-width="2.5" stroke-linecap="round">
+        <animate attributeName="d"
+          values="M82,128 Q100,136 118,128;M68,124 Q100,160 132,124;M68,124 Q100,160 132,124;M82,128 Q100,136 118,128"
+          keyTimes="0;0.25;0.7;1" dur="4s" repeatCount="indefinite"/>
+      </path>
+      <rect x="84" y="128" width="32" height="0" rx="2" fill="white" stroke="#ddd" stroke-width="0.5">
+        <animate attributeName="height" values="0;12;12;0" keyTimes="0;0.25;0.7;1" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="width" values="32;44;44;32" keyTimes="0;0.25;0.7;1" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="x" values="84;78;78;84" keyTimes="0;0.25;0.7;1" dur="4s" repeatCount="indefinite"/>
+      </rect>
+      <text x="100" y="208" text-anchor="middle" fill="#888" font-size="12" font-weight="600">用力大笑露齒</text>`,
+  };
+
+  return `<svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">${face}${anims[exerciseId] || ''}</svg>`;
+}
+
+// ============================================================
+//  Main Application
+// ============================================================
+class App {
+  constructor() {
+    this.faceLandmarker = null;
+    this.video = document.getElementById('video');
+    this.canvas = document.getElementById('canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.stream = null;
+    this.animFrame = null;
+    this.detector = null;
+    this.currentExercise = null;
+    this.exerciseState = 'idle'; // idle, countdown, active, complete
+    this.countdownValue = 3;
+    this.startTime = 0;
+    this.courseMode = false;
+    this.courseIndex = 0;
+    this.courseResults = [];
+    this.drawUtils = null;
+    this.lastFrameTime = 0;
+    this.faceDetected = false;
+  }
+
+  async init() {
+    this.buildExerciseGrid();
+    // Preload model in background
+    this.loadModel();
+  }
+
+  async loadModel() {
+    try {
+      const loading = document.getElementById('loading');
+      loading.style.display = 'flex';
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+      );
+      this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU"
+        },
+        outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: false,
+        runningMode: "VIDEO",
+        numFaces: 1,
+      });
+      loading.style.display = 'none';
+    } catch (e) {
+      console.error('Model load error:', e);
+      document.getElementById('loading').innerHTML =
+        `<div style="text-align:center;color:white;padding:20px">
+          <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+          <div style="font-size:18px;margin-bottom:8px">模型載入失敗</div>
+          <div style="font-size:14px;opacity:0.7">請確認網路連線正常，並重新整理頁面</div>
+          <div style="font-size:12px;opacity:0.5;margin-top:12px">${e.message}</div>
+        </div>`;
+    }
+  }
+
+  buildExerciseGrid() {
+    const grid = document.getElementById('exercise-grid');
+    grid.innerHTML = EXERCISES.map(ex => `
+      <div class="exercise-card" onclick="app.selectExercise('${ex.id}')">
+        <div class="icon">${ex.icon}</div>
+        <div class="name">${ex.name}</div>
+        <div class="info">${ex.desc}</div>
+      </div>
+    `).join('');
+  }
+
+  // Navigation
+  showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  goHome() {
+    this.stopCamera();
+    this.showPage('page-home');
+  }
+
+  startSingleMode() {
+    this.courseMode = false;
+    this.showPage('page-select');
+  }
+
+  async startCourseMode() {
+    this.courseMode = true;
+    this.courseIndex = 0;
+    this.courseResults = [];
+    await this.launchExercise(EXERCISES[0]);
+  }
+
+  async selectExercise(id) {
+    const ex = EXERCISES.find(e => e.id === id);
+    if (ex) await this.launchExercise(ex);
+  }
+
+  async launchExercise(exerciseConfig) {
+    this.currentExercise = exerciseConfig;
+    this.detector = new ExerciseDetector(exerciseConfig);
+    this.exerciseState = 'idle';
+
+    // Setup UI
+    document.getElementById('ex-icon').textContent = exerciseConfig.icon;
+    document.getElementById('ex-name').textContent = exerciseConfig.name;
+    document.getElementById('ex-desc').textContent = exerciseConfig.instruction;
+    document.getElementById('counter-current').textContent = '0';
+    document.getElementById('counter-target').textContent = exerciseConfig.target;
+    document.getElementById('bottom-hud').style.display = 'none';
+    document.getElementById('hold-area').style.display = exerciseConfig.type === 'hold' ? 'block' : 'none';
+
+    // Show animated demo
+    const demoPanel = document.getElementById('demo-panel');
+    demoPanel.innerHTML = getDemoSVG(exerciseConfig.id) + `<div class="demo-label">動作示範</div>`;
+    demoPanel.style.display = 'block';
+
+    this.showPage('page-exercise');
+
+    // Ensure model is loaded
+    if (!this.faceLandmarker) {
+      document.getElementById('loading').style.display = 'flex';
+      while (!this.faceLandmarker) await new Promise(r => setTimeout(r, 200));
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    await this.startCamera();
+    this.showStartButton();
+  }
+
+  showStartButton() {
+    const area = document.getElementById('countdown-area');
+    area.innerHTML = `<button class="start-btn" id="start-exercise-btn">準備好了嗎？開始！</button>`;
+    document.getElementById('start-exercise-btn').addEventListener('click', () => {
+      this.startCountdown();
+    });
+  }
+
+  startCountdown() {
+    this.exerciseState = 'countdown';
+    this.countdownValue = 3;
+    document.getElementById('bottom-hud').style.display = 'none';
+    this.tickCountdown();
+  }
+
+  tickCountdown() {
+    const area = document.getElementById('countdown-area');
+    if (this.countdownValue > 0) {
+      area.innerHTML = `<div class="countdown-display" key="${this.countdownValue}">${this.countdownValue}</div>`;
+      this.countdownValue--;
+      setTimeout(() => this.tickCountdown(), 800);
+    } else {
+      area.innerHTML = '';
+      this.beginExercise();
+    }
+  }
+
+  beginExercise() {
+    this.exerciseState = 'active';
+    this.detector.reset();
+    this.startTime = performance.now();
+    document.getElementById('bottom-hud').style.display = 'flex';
+    document.getElementById('counter-current').textContent = '0';
+  }
+
+  // Camera
+  async startCamera() {
+    if (this.stream) return;
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+      });
+      this.video.srcObject = this.stream;
+      await this.video.play();
+      this.canvas.width = this.video.videoWidth;
+      this.canvas.height = this.video.videoHeight;
+      this.drawUtils = new DrawingUtils(this.ctx);
+      this.lastFrameTime = 0;
+      this.processFrame();
+    } catch (e) {
+      alert('無法存取相機，請允許相機權限後重試。\n\n錯誤: ' + e.message);
+      this.goHome();
+    }
+  }
+
+  stopCamera() {
+    if (this.animFrame) cancelAnimationFrame(this.animFrame);
+    this.animFrame = null;
+    if (this.stream) {
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;
+    }
+    this.video.srcObject = null;
+  }
+
+  processFrame() {
+    if (!this.stream) return;
+    this.animFrame = requestAnimationFrame(() => this.processFrame());
+
+    if (this.video.readyState < 2) return;
+    const now = performance.now();
+    // Throttle to ~30fps
+    if (now - this.lastFrameTime < 33) return;
+    this.lastFrameTime = now;
+
+    // Draw mirrored video
+    this.ctx.save();
+    this.ctx.scale(-1, 1);
+    this.ctx.drawImage(this.video, -this.canvas.width, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
+
+    // Run face detection
+    const results = this.faceLandmarker.detectForVideo(this.video, now);
+
+    if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+      this.faceDetected = true;
+      // Draw subtle face mesh (mirrored)
+      this.ctx.save();
+      this.ctx.scale(-1, 1);
+      this.ctx.translate(-this.canvas.width, 0);
+      this.drawUtils.drawConnectors(
+        results.faceLandmarks[0],
+        FaceLandmarker.FACE_LANDMARKS_TESSELATION,
+        { color: 'rgba(200,200,200,0.15)', lineWidth: 0.5 }
+      );
+      this.drawUtils.drawConnectors(
+        results.faceLandmarks[0],
+        FaceLandmarker.FACE_LANDMARKS_LIPS,
+        { color: 'rgba(255,150,100,0.6)', lineWidth: 2 }
+      );
+      this.ctx.restore();
+
+      // Process blendshapes
+      if (results.faceBlendshapes && results.faceBlendshapes.length > 0) {
+        const cats = results.faceBlendshapes[0].categories;
+        // Always show debug panel when exercise page is active
+        this.updateBsDebug(cats);
+        if (this.exerciseState === 'active') {
+          this.updateDetection(cats, now);
+        }
+      }
+    } else {
+      this.faceDetected = false;
+    }
+
+    // Update no-face warning
+    this.updateFaceWarning();
+  }
+
+  updateDetection(categories, now) {
+    // Build blendshape lookup
+    const bsMap = {};
+    categories.forEach(c => { bsMap[c.categoryName] = c.score; });
+    const bsGetter = (name) => bsMap[name] || 0;
+
+    const result = this.detector.update(bsGetter, now);
+
+    // Update status indicator
+    const indicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+    const scoreFill = document.getElementById('score-fill');
+
+    if (result.isActive) {
+      indicator.className = 'status-indicator active';
+      statusText.textContent = '偵測到動作！';
+    } else {
+      indicator.className = 'status-indicator inactive';
+      statusText.textContent = '等待動作...';
+    }
+
+    // Score bar
+    scoreFill.style.width = (Math.min(result.score, 1) * 100) + '%';
+    document.getElementById('debug-score').textContent =
+      `偵測值: ${result.score.toFixed(3)} | 觸發: ${this.currentExercise.enterThreshold}`;
+
+    // Hold progress bar
+    if (this.currentExercise.type === 'hold') {
+      document.getElementById('hold-bar').style.width = (result.holdProgress * 100) + '%';
+    }
+
+    // Rep completed
+    if (result.repCompleted) {
+      document.getElementById('counter-current').textContent = this.detector.reps;
+      this.showRepFlash();
+
+      // Check if exercise complete
+      if (this.detector.reps >= this.currentExercise.target) {
+        this.completeExercise();
+      }
+    }
+  }
+
+  showRepFlash() {
+    const flash = document.createElement('div');
+    flash.className = 'rep-flash';
+    flash.textContent = '✓';
+    document.querySelector('.camera-container').appendChild(flash);
+    setTimeout(() => flash.remove(), 800);
+  }
+
+  updateBsDebug(categories) {
+    const panel = document.getElementById('bs-debug-panel');
+    panel.style.display = 'block';
+    const keys = [
+      'jawOpen','jawForward','jawLeft','jawRight',
+      'mouthPucker','mouthFunnel',
+      'mouthSmileLeft','mouthSmileRight',
+      'mouthShrugLower','mouthShrugUpper',
+      'mouthLowerDownLeft','mouthLowerDownRight',
+      'mouthUpperUpLeft','mouthUpperUpRight',
+      'mouthStretchLeft','mouthStretchRight',
+      'mouthRollLower','mouthRollUpper',
+      'mouthClose','mouthDimpleLeft','mouthDimpleRight',
+      'cheekPuff','cheekSquintLeft','cheekSquintRight',
+    ];
+    const bsMap = {};
+    categories.forEach(c => { bsMap[c.categoryName] = c.score; });
+    const lines = keys.map(k => {
+      const v = bsMap[k] || 0;
+      const bar = '█'.repeat(Math.round(v * 20));
+      const color = v > 0.3 ? '#0f0' : v > 0.15 ? '#ff0' : '#666';
+      return `<span style="color:${color}">${k.replace('mouth','m').padEnd(18)} ${v.toFixed(3)} ${bar}</span>`;
+    });
+    panel.innerHTML = '<b style="color:white">🔍 Blendshape 即時偵測</b><br>' + lines.join('<br>');
+  }
+
+  updateFaceWarning() {
+    const area = document.getElementById('countdown-area');
+    if (this.exerciseState === 'active' && !this.faceDetected) {
+      if (!area.querySelector('.no-face-warning')) {
+        area.innerHTML = '<div class="no-face-warning">未偵測到臉部，請面對鏡頭</div>';
+      }
+    } else if (this.exerciseState === 'active' && this.faceDetected) {
+      if (area.querySelector('.no-face-warning')) {
+        area.innerHTML = '';
+      }
+    }
+  }
+
+  completeExercise() {
+    this.exerciseState = 'complete';
+    const elapsed = Math.round((performance.now() - this.startTime) / 1000);
+
+    if (this.courseMode) {
+      this.courseResults.push({
+        exercise: this.currentExercise,
+        reps: this.detector.reps,
+        time: elapsed,
+      });
+
+      this.courseIndex++;
+      if (this.courseIndex < EXERCISES.length) {
+        // Next exercise in course
+        setTimeout(() => {
+          this.launchExercise(EXERCISES[this.courseIndex]);
+        }, 1000);
+        return;
+      } else {
+        // Course complete
+        this.stopCamera();
+        this.showCourseResult();
+        return;
+      }
+    }
+
+    // Single mode result
+    this.stopCamera();
+    document.getElementById('result-icon').textContent = '🎉';
+    document.getElementById('result-title').textContent = `${this.currentExercise.name} 練習完成！`;
+    document.getElementById('result-detail').textContent = `你成功完成了 ${this.detector.reps} 次`;
+    document.getElementById('result-reps').textContent = this.detector.reps;
+    document.getElementById('result-time').textContent = elapsed;
+    this.showPage('page-result');
+  }
+
+  showCourseResult() {
+    const summary = document.getElementById('course-summary');
+    summary.innerHTML = this.courseResults.map(r => `
+      <div class="course-item">
+        <span class="ci-icon">${r.exercise.icon}</span>
+        <span class="ci-name">${r.exercise.name}</span>
+        <span class="ci-result">${r.reps}/${r.exercise.target} 次 · ${r.time}秒</span>
+      </div>
+    `).join('');
+    this.showPage('page-course-result');
+  }
+
+  retryExercise() {
+    if (this.currentExercise) {
+      this.launchExercise(this.currentExercise);
+    }
+  }
+
+  exitExercise() {
+    this.exerciseState = 'idle';
+    this.stopCamera();
+    document.getElementById('demo-panel').style.display = 'none';
+    document.getElementById('bs-debug-panel').style.display = 'none';
+    if (this.courseMode) {
+      this.goHome();
+    } else {
+      this.showPage('page-select');
+    }
+  }
+}
+
+// ============================================================
+//  Initialize
+// ============================================================
+const app = new App();
+window.app = app;
+app.init();
+</script>
+</body>
+</html>
