@@ -294,7 +294,18 @@ const EXERCISES = [
     desc: '臉頰鼓起後放鬆',
     instruction: '請將臉頰用力鼓起來',
     type: 'toggle', target: 5,
-    blendshape: 'cheekPuff', enterThreshold: 0.12, exitThreshold: 0.04,
+    getScore: (bs) => {
+      // cheekPuff 在許多使用者上偵測值為 0，改用複合指標：
+      // 臉頰鼓起時：嘴角被撐開(smile) + 下顎微張(jawOpen) + 上唇外翻(mRollUpper)
+      const cheekPuff = bs('cheekPuff');
+      const smile = (bs('mouthSmileLeft') + bs('mouthSmileRight')) / 2;
+      const jaw = bs('jawOpen');
+      const rollUpper = bs('mouthRollUpper');
+      // 如果原生 cheekPuff 有值就優先使用，否則用複合分數
+      if (cheekPuff > 0.08) return cheekPuff;
+      return smile * 0.45 + jaw * 0.30 + rollUpper * 0.25;
+    },
+    enterThreshold: 0.18, exitThreshold: 0.08,
   },
   {
     id: 'smile', icon: '😁', name: '一笑呷百二',
