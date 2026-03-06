@@ -4,17 +4,21 @@
 
 ## Demo
 
-部署後直接在瀏覽器開啟即可使用（需允許相機權限）。
+**線上版**：https://oral-exercise-vercel.vercel.app
+
+直接在瀏覽器開啟即可使用（需允許相機權限）。
 
 ## 支援的訓練動作
 
 | 動作 | 偵測方式 | 計次邏輯 |
 |------|---------|---------|
-| 🌍 戽斗星球 | 下顎前突（jawForward） | 維持 3 秒 = 1 次 |
-| 🐸 青蛙捕食 | 張嘴 + 下唇下拉 + 下唇伸展（複合分數） | 張嘴→閉嘴 = 1 次 |
+| 🌍 戽斗星球 | 下顎前突（mouthRollLower） | 維持 3 秒 = 1 次 |
+| 🐸 青蛙捕食 | 下唇下拉程度（mouthLowerDown） | 伸舌→收回 = 1 次 |
 | 🐙 章魚吸盤 | 嘟嘴（mouthPucker） | 嘟嘴→放鬆 = 1 次 |
-| 🐡 河豚鼓鼓 | 臉頰鼓起（cheekPuff） | 鼓起→放鬆 = 1 次 |
+| 🐡 河豚鼓鼓 | 上唇翻捲 + 嘴巴閉合（mouthRollUpper + mouthClose） | 鼓起→放鬆 = 1 次 |
 | 😁 一笑呷百二 | 左右嘴角上揚（mouthSmile） | 維持 3 秒 = 1 次 |
+
+> **註**：部分 MediaPipe blendshape（如 `cheekPuff`、`jawForward`）對某些使用者回傳值極低，因此使用替代的複合指標偵測。
 
 ## 功能
 
@@ -43,11 +47,22 @@ Webcam → MediaPipe Face Landmarker → 52 Blendshapes
 
 ### 偵測機制
 
-- **EMA 平滑**：alpha=0.5，降低逐幀雜訊
+- **EMA 平滑**：預設 alpha=0.35，各動作可獨立設定 `smoothAlpha`
 - **遲滯閾值**：enter 與 exit 使用不同閾值，防止邊界抖動
-- **Cooldown**：計次後短暫冷卻期，防止重複計算
+- **Cooldown**：計次後短暫冷卻期（預設 300ms，各動作可獨立設定 `cooldownMs`），防止重複計算
 - **Toggle 型**（青蛙、章魚、河豚）：偵測值超過 enterThreshold → 低於 exitThreshold = 1 次
 - **Hold 型**（戽斗、笑）：偵測值持續超過 enterThreshold 達 3 秒 = 1 次
+
+### 演算法校準紀錄
+
+偵測閾值經過實測影片逐一校準。校準方法：
+
+1. 使用者錄製實際操作影片
+2. 用 ffmpeg 提取畫面，讀取 debug 面板的 blendshape 數值
+3. 比較「動作中」vs「休息」的數值差異，選擇分離度最佳的指標
+4. 設定 enterThreshold / exitThreshold 確保兩狀態間有足夠間距
+
+詳細校準歷程與數據見 [memory.md](memory.md)。
 
 ## 本地開發
 
@@ -93,8 +108,9 @@ npx vercel --prod
 
 ## 已知限制
 
-- MediaPipe 標準 52 blendshape 不含 `tongueOut`，青蛙捕食使用間接指標偵測（張嘴程度）
+- MediaPipe 標準 52 blendshape 不含 `tongueOut`，青蛙捕食使用 mouthLowerDown 間接偵測
 - 河豚鼓鼓無法區分左右臉頰（`cheekPuff` 僅提供總值），使用者需自行交替
+- 部分 blendshape（cheekPuff、jawForward）對某些使用者無反應，需使用替代指標
 - 偵測閾值可能因個人臉部特徵、光線、相機距離而需微調
 - 需要支援 WebGL 的現代瀏覽器（Chrome、Edge、Safari、Firefox）
 

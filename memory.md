@@ -4,6 +4,12 @@
 
 使用者（Che-Wei）擁有一組來自成功大學附設醫院的口咽肌肉功能訓練衛教影片（2024 最新版本，鏡像版本），希望開發一個 webcam 即時偵測系統，讓患者在家訓練時可以自動判斷動作是否完成、並計算次數。
 
+## 部署資訊
+
+- **GitHub**：https://github.com/elfj/oral-exercise
+- **Vercel**：https://oral-exercise-vercel.vercel.app
+- **GitHub 帳號**：elfj
+
 ## 開發歷程
 
 ### 第一階段：影片分析與可行性評估
@@ -40,57 +46,103 @@
 - 從 CDN 載入 WASM + 模型，零後端
 - 使用 52 個 ARKit 相容 blendshape 進行偵測
 
-**5 個動作的偵測對應：**
-
-| 動作 | Blendshape | 類型 |
-|------|-----------|------|
-| 戽斗星球 | `jawForward` | hold（維持 3 秒） |
-| 青蛙捕食 | `jawOpen` × 0.5 + `mouthLowerDownLeft/Right` × 0.3 + `mouthShrugLower` × 0.2（複合分數） | toggle |
-| 章魚吸盤 | `mouthPucker` | toggle |
-| 河豚鼓鼓 | `cheekPuff` | toggle |
-| 一笑呷百二 | (`mouthSmileLeft` + `mouthSmileRight`) / 2 | hold（維持 3 秒） |
-
 **偵測架構：**
-- `Smoother` 類別：EMA 平滑（alpha=0.5）
+- `Smoother` 類別：EMA 平滑（預設 alpha=0.35，可由各動作覆蓋）
 - `ExerciseDetector` 類別：狀態機 + 遲滯（enter/exit 不同閾值）+ cooldown 防重複計數
+- 支援每個動作獨立設定 `smoothAlpha` 和 `cooldownMs`
 - toggle 型：偵測值上升超過 enterThreshold → 下降低於 exitThreshold = 1 次
 - hold 型：偵測值持續超過 enterThreshold 達 holdMs 毫秒 = 1 次
-
-### 第三階段：問題修復與迭代
-
-**問題 1：本地檔案無法存取相機**
-- 原因：瀏覽器不允許 `file://` 協定使用 `getUserMedia`
-- 解決：建立 `啟動訓練系統.command` 腳本，自動啟動 Python HTTP server + 開啟瀏覽器
-
-**問題 2：偵測閾值太高，動作難以觸發**
-- 原因：初始閾值設得太保守
-- 解決：全面降低閾值（降幅 38%~60%），提高 smoothing 響應度（alpha 0.35→0.5）
-- 特別是青蛙捕食：從單一 `jawOpen`（0.55）改為 3 個 blendshape 的複合分數（0.22）
-
-**問題 3：使用者反映青蛙捕食仍然偵測不到**
-- 解決：加入即時 blendshape debug 面板（右上角顯示所有嘴巴相關 blendshape 數值），用於診斷和校準
-- 目前狀態：等待使用者測試回報具體數值
 
 **增加功能：動畫示範面板**
 - 使用者反映只看文字說明不知道怎麼做動作
 - 為每個動作建立 SVG 動畫（SMIL 原生動畫），顯示在畫面左側
-- 5 個動畫：下顎前推、張嘴伸舌、嘟嘴放鬆、臉頰交替鼓、大笑露齒
 
-### 第四階段：部署
+### 第三階段：部署
 
-- 使用者希望部署到雲端（Vercel + GitHub）
-- 準備了 Vercel 部署用的專案結構：`vercel.json` + `public/index.html`
-- 因 Cowork 環境限制無法直接 push，提供了完整的 GitHub → Vercel 部署步驟
+- GitHub repo: https://github.com/elfj/oral-exercise (master branch)
+- Vercel 靜態網站: https://oral-exercise-vercel.vercel.app
+- `vercel.json` 設定 `Permissions-Policy: camera=self` header
 
-## 目前閾值設定
+### 第四階段：演算法校準（基於實測影片）
+
+使用者錄製實際操作影片，用 ffmpeg 提取畫面分析 debug 面板的 blendshape 數值，逐一校準每個動作的偵測演算法。
+
+**關鍵發現：多個 MediaPipe blendshape 對此使用者回傳 0，需改用替代指標。**
+
+#### 河豚鼓鼓（pufferfish）— 3 輪修正
+
+**問題**：`cheekPuff` blendshape 永遠回傳 0.000。
+
+- **第 1 輪**：改用 mSmileLeft/Right 複合分數 → 失敗（mSmile 也是 0）
+- **第 2 輪**：改用 `mRollUpper*0.6 + mClose*0.4`，exitThreshold 0.18 → 失敗（運動間 mClose 維持 0.290，分數 0.221 > 0.18，toggle 無法完成）
+- **第 3 輪（最終）**：降低 mClose 權重 → `mRollUpper*0.8 + mClose*0.2`，exitThreshold 提高至 0.22，新增 smoothAlpha 0.6 + cooldownMs 600
+  - 運動間分數 0.198 < 0.22 exit ✓
+
+#### 戽斗星球（underbite）
+
+**問題**：`jawForward` blendshape 永遠回傳 0.000（最高 0.010）。
+
+- **分析**：mouthRollLower 從靜止 ~0.1 跳到下顎前突時 ~0.97
+- **修正**：改用 `mouthRollLower`（保留 jawForward > 0.08 的 fallback），enterThreshold 0.35，exitThreshold 0.20
+
+#### 青蛙捕食（frog）
+
+**問題**：舊公式 `jawOpen*0.5 + mLowerDown*0.3 + mShrugLower*0.2` 中，jawOpen 在休息時仍高達 0.41-0.63，導致分數永遠 > exitThreshold 0.10，toggle 無法完成。
+
+- **分析**：mouthLowerDownLeft/Right 是真正的差異指標
+  - 舌頭伸出：0.37-0.68
+  - 休息：0.005-0.04
+- **修正**：改用純 `(mouthLowerDownLeft + mouthLowerDownRight) / 2`，enterThreshold 0.15，exitThreshold 0.06，smoothAlpha 0.5，cooldownMs 400
+
+## 目前偵測設定（最新）
 
 ```javascript
-underbite: enterThreshold: 0.10, exitThreshold: 0.05
-frog:      enterThreshold: 0.22, exitThreshold: 0.10  (複合分數)
-octopus:   enterThreshold: 0.25, exitThreshold: 0.10
-pufferfish: enterThreshold: 0.12, exitThreshold: 0.04
-smile:     enterThreshold: 0.28, exitThreshold: 0.12
+// 戽斗星球 — hold 3 秒
+underbite: {
+  getScore: jawForward > 0.08 ? jawForward : mouthRollLower,
+  enterThreshold: 0.35, exitThreshold: 0.20
+}
+
+// 青蛙捕食 — toggle
+frog: {
+  getScore: (mouthLowerDownLeft + mouthLowerDownRight) / 2,
+  enterThreshold: 0.15, exitThreshold: 0.06,
+  smoothAlpha: 0.5, cooldownMs: 400
+}
+
+// 章魚吸盤 — toggle
+octopus: {
+  blendshape: 'mouthPucker',
+  enterThreshold: 0.25, exitThreshold: 0.10
+}
+
+// 河豚鼓鼓 — toggle
+pufferfish: {
+  getScore: cheekPuff > 0.08 ? cheekPuff : mouthRollUpper * 0.8 + mouthClose * 0.2,
+  enterThreshold: 0.28, exitThreshold: 0.22,
+  smoothAlpha: 0.6, cooldownMs: 600
+}
+
+// 一笑呷百二 — hold 3 秒
+smile: {
+  getScore: (mouthSmileLeft + mouthSmileRight) / 2,
+  enterThreshold: 0.28, exitThreshold: 0.12
+}
 ```
+
+## 校準方法論
+
+1. 使用者錄製實際操作影片（MOV）
+2. 用 ffmpeg 提取畫面（`fps=2`），裁切右半部（debug 面板）
+3. 讀取每幀 blendshape 數值，區分「動作中」vs「休息」
+4. 找出分離度最佳的 blendshape 指標
+5. 設定 enterThreshold / exitThreshold 確保兩狀態間有足夠間距
+6. 部署後使用者實測驗證
+
+**重要教訓：**
+- 靜態擺拍的基準值 ≠ 運動中的基準值（運動中肌肉張力較高）
+- 必須分析實際運動影片，不能只看靜態截圖
+- MediaPipe 某些 blendshape 對特定使用者可能完全無反應（回傳 0），需要替代指標
 
 ## 檔案結構
 
@@ -98,21 +150,21 @@ smile:     enterThreshold: 0.28, exitThreshold: 0.12
 影片/
 ├── 【衛教影片】*.mp4              ← 16 支原始衛教影片
 ├── 口咽肌肉訓練_Webcam偵測分析報告.md  ← 可行性分析報告
-├── oral_exercise_trainer.html     ← 主程式（含 debug 面板）
+├── oral_exercise_trainer.html     ← 主程式（本地版，與 Vercel 版同步）
 ├── 啟動訓練系統.command            ← macOS 本地啟動腳本
-└── oral-exercise-vercel/          ← Vercel 部署用
+└── oral-exercise-vercel/          ← Vercel 部署用（GitHub repo）
     ├── vercel.json
-    ├── memory.md
+    ├── memory.md                  ← 本檔案
     ├── README.md
     └── public/
-        └── index.html             ← 主程式副本
+        └── index.html             ← 主程式
 ```
 
 ## 待辦 / 已知問題
 
-- [ ] 青蛙捕食偵測仍需根據實測數據校準
-- [ ] MediaPipe 標準 52 blendshape 不含 `tongueOut`，伸舌偵測只能用間接指標
-- [ ] 河豚鼓鼓目前無法區分左右臉頰（cheekPuff 只有一個總值），只計整體鼓起次數
-- [ ] debug 面板上線後應可移除或加開關
+- [ ] 章魚吸盤、一笑呷百二尚未經過實測影片校準
+- [ ] MediaPipe 標準 52 blendshape 不含 `tongueOut`，青蛙捕食使用 mouthLowerDown 間接偵測
+- [ ] 河豚鼓鼓無法區分左右臉頰（cheekPuff 只有一個總值），只計整體鼓起次數
+- [ ] debug 面板目前常駐顯示，可考慮加開關
 - [ ] 完整課程模式的動作間休息時間可加長
 - [ ] 可考慮加入音效回饋
