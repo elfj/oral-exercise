@@ -294,14 +294,15 @@ const EXERCISES = [
     desc: '臉頰鼓起後放鬆',
     instruction: '請將臉頰用力鼓起來',
     type: 'toggle', target: 5,
+    smoothAlpha: 0.6, cooldownMs: 600,
     getScore: (bs) => {
-      // cheekPuff 在許多使用者上為 0，改用 mRollUpper + mClose 複合偵測
-      // 臉頰鼓起時上唇外翻(mRollUpper)和嘴巴閉合壓力(mClose)顯著上升
+      // cheekPuff 在許多使用者上為 0，改用 mRollUpper 為主 + mClose 輔助
+      // mRollUpper 對「鼓起 vs 放鬆」的區分度最佳（delta ~0.3）
       const cheekPuff = bs('cheekPuff');
       if (cheekPuff > 0.08) return cheekPuff;
-      return bs('mouthRollUpper') * 0.6 + bs('mouthClose') * 0.4;
+      return bs('mouthRollUpper') * 0.8 + bs('mouthClose') * 0.2;
     },
-    enterThreshold: 0.28, exitThreshold: 0.18,
+    enterThreshold: 0.28, exitThreshold: 0.22,
   },
   {
     id: 'smile', icon: '😁', name: '一笑呷百二',
@@ -328,7 +329,7 @@ class Smoother {
 class ExerciseDetector {
   constructor(config) {
     this.config = config;
-    this.smoother = new Smoother(0.35);
+    this.smoother = new Smoother(config.smoothAlpha || 0.35);
     this.isActive = false;
     this.reps = 0;
     this.holdStart = 0;
@@ -378,7 +379,7 @@ class ExerciseDetector {
         this.reps++;
         repCompleted = true;
         this.cooldown = true;
-        this.cooldownEnd = now + 300;
+        this.cooldownEnd = now + (c.cooldownMs || 300);
       }
       return { isActive: this.isActive, score, holdProgress: 0, repCompleted };
     }
