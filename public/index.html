@@ -280,14 +280,14 @@ const EXERCISES = [
     desc: '舌頭伸出嘴外，往上指',
     instruction: '請張大嘴巴，舌頭用力往前伸出',
     type: 'toggle', target: 5,
+    smoothAlpha: 0.5, cooldownMs: 400,
     getScore: (bs) => {
-      // 複合偵測：張嘴 + 下唇下拉 + 嘴巴伸展 = 伸舌頭的特徵
-      const jaw = bs('jawOpen');
+      // 核心指標：mouthLowerDown（舌頭伸出時顯著上升 0.37-0.68，休息時 <0.04）
+      // jawOpen 在休息時仍高達 0.4-0.6，不適合作為主指標
       const lowerDown = (bs('mouthLowerDownLeft') + bs('mouthLowerDownRight')) / 2;
-      const shrugLower = bs('mouthShrugLower');
-      return jaw * 0.5 + lowerDown * 0.3 + shrugLower * 0.2;
+      return lowerDown;
     },
-    enterThreshold: 0.22, exitThreshold: 0.10,
+    enterThreshold: 0.15, exitThreshold: 0.06,
   },
   {
     id: 'octopus', icon: '🐙', name: '章魚吸盤',
