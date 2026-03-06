@@ -266,7 +266,14 @@ const EXERCISES = [
     desc: '下顎往前突出，維持 3 秒',
     instruction: '請將下巴盡量往前推',
     type: 'hold', holdMs: 3000, target: 5,
-    blendshape: 'jawForward', enterThreshold: 0.10, exitThreshold: 0.05,
+    getScore: (bs) => {
+      // jawForward 在許多使用者上為 0，改用 mouthRollLower
+      // 下顎前突時 mouthRollLower 從 ~0.1 跳升到 ~0.97
+      const jawFwd = bs('jawForward');
+      if (jawFwd > 0.08) return jawFwd;
+      return bs('mouthRollLower');
+    },
+    enterThreshold: 0.35, exitThreshold: 0.20,
   },
   {
     id: 'frog', icon: '🐸', name: '青蛙捕食',
